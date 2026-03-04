@@ -1,30 +1,33 @@
-import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'Minimal Fit - AI 운동 보조',
-  description: 'AI 박자 가이드와 자동 동기화로 조작을 최소화하는 운동 앱',
+  title: "Minimal Fit",
+  description: "AI Workout Guide",
+  manifest: "/manifest.json", // PWA 설정을 위해 필요
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Minimal Fit",
+  },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover", // 아이폰 노치 영역까지 활용
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className="bg-gray-100 flex justify-center items-center min-h-screen antialiased">
-        {/* [PRD 4조 준수] 
-            1. 가로 최대 480px 고정 
-            2. 세로 전체 높이(100vh) 사용 
-            3. 중앙 정렬 및 그림자 효과로 앱 느낌 구현 
-        */}
-        <div 
-          id="app-frame" 
-          className="w-full max-w-[480px] h-[100vh] bg-white shadow-2xl relative overflow-hidden flex flex-col border-x border-gray-200"
-        >
+      <body className="bg-black flex justify-center items-center min-h-[100dvh]">
+        {/* 모바일 꽉 차는 중앙 프레임 */}
+        <main className="w-full max-w-[480px] h-[100dvh] bg-white shadow-2xl flex flex-col items-center justify-center relative overflow-hidden">
           {children}
-        </div>
+        </main>
       </body>
     </html>
   );
