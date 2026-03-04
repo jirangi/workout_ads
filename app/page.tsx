@@ -1,18 +1,13 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { EXERCISE_DATABASE, ExerciseInfo } from "../data/exercises"; // @/ 대신 ../ 사용으로 경로 안정성 확보
-
-interface SetData {
-  id: number;
-  weight: number;
-  reps: number;
-  isEdited: boolean;
-}
+import { EXERCISE_DATABASE } from "../data/exercises";
 
 export default function Home() {
+  const [selectionStep, setSelectionStep] = useState(0); // 0: Level, 1: Type, 2: Workout
+  const [selectedLevel, setSelectedLevel] = useState("");
   const [selectedRoutine, setSelectedRoutine] = useState<any>(null);
   const [currentExIndex, setCurrentExIndex] = useState(0);
-  const [sets, setSets] = useState<SetData[]>([]);
+  const [sets, setSets] = useState<any[]>([]);
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
   const [isResting, setIsResting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(60);
@@ -28,6 +23,7 @@ export default function Home() {
     }
   }, []);
 
+  // [F2] 템포 엔진 & [F13] 휴식 타이머 로직 (기존과 동일)
   useEffect(() => {
     let interval: any;
     if (isTempoOn && !isResting && selectedRoutine) {
@@ -57,12 +53,20 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [isResting, timeLeft]);
 
-  const startRoutine = (name: string, exIds: string[]) => {
+  // [F14] 루틴 시작 로직
+  const handleLevelSelect = (level: string) => {
+    setSelectedLevel(level);
+    setSelectionStep(1);
+  };
+
+  const handleTypeSelect = (type: string) => {
+    // 임시 데이터 매핑 (나중에 DB 고도화 시 확장 가능)
+    const exIds = type === "무분할" ? ["sq_quad", "bp_mid", "dl_back"] : ["bp_mid", "ld_width"];
     const routineEx = exIds.map(id => EXERCISE_DATABASE.find(e => e.id === id)).filter(Boolean);
-    setSelectedRoutine({ name, exercises: routineEx });
-    setCurrentExIndex(0);
-    setCurrentSetIndex(0);
+    
+    setSelectedRoutine({ name: `${selectedLevel} ${type}`, exercises: routineEx });
     setupExercise(routineEx[0]);
+    setSelectionStep(2);
   };
 
   const setupExercise = (ex: any) => {
@@ -71,6 +75,7 @@ export default function Home() {
     })));
   };
 
+  // [F1] Zero-Click 동기화
   const updateSetValue = (index: number, field: "weight" | "reps", value: number) => {
     const newSets = [...sets];
     newSets[index][field] = value;
@@ -94,33 +99,61 @@ export default function Home() {
       setCurrentSetIndex(0);
       setupExercise(selectedRoutine.exercises[nextIndex]);
     } else {
-      alert("전체 완료!");
+      alert("전체 루틴 완료!");
+      setSelectionStep(0);
       setSelectedRoutine(null);
     }
   };
 
-  if (!selectedRoutine) {
+  // Step 0: 숙련도 선택
+  if (selectionStep === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-gray-50">
-        <h1 className="text-5xl font-black mb-16 tracking-tighter">MINIMAL FIT</h1>
-        <button onClick={() => startRoutine("초급 무분할", ["sq_quad", "bp_mid", "dl_back"])} className="w-full max-w-[400px] p-8 bg-white border-2 rounded-[2rem] text-left shadow-sm active:scale-95 transition-all">
-          <span className="text-[10px] font-black text-blue-600 px-2 py-1 bg-blue-50 rounded-md uppercase">초급</span>
-          <h3 className="text-xl font-black text-gray-800 mt-2">전신 무분할 시작</h3>
-        </button>
+      <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-gray-50 text-center">
+        <h1 className="text-4xl font-black mb-12 tracking-tighter">MINIMAL FIT</h1>
+        <p className="text-gray-400 font-bold mb-8 uppercase tracking-widest text-xs">Choose Your Level</p>
+        <div className="w-full max-w-[320px] space-y-4">
+          {["초급", "중급", "고급"].map((level) => (
+            <button key={level} onClick={() => handleLevelSelect(level)} className="w-full p-6 bg-white border-2 rounded-3xl font-black text-xl shadow-sm active:scale-95 transition-all">
+              {level}
+            </button>
+          ))}
+        </div>
       </div>
     );
   }
 
+  // Step 1: 루틴 유형 선택
+  if (selectionStep === 1) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-gray-50 text-center">
+        <header className="absolute top-12 left-10">
+          <button onClick={() => setSelectionStep(0)} className="text-gray-300 font-bold">← BACK</button>
+        </header>
+        <h1 className="text-3xl font-black mb-12 tracking-tighter">{selectedLevel}</h1>
+        <p className="text-gray-400 font-bold mb-8 uppercase tracking-widest text-xs">Select Routine Type</p>
+        <div className="w-full max-w-[320px] space-y-4">
+          {["추천루틴", "무분할", "2분할(상하체)"].map((type) => (
+            <button key={type} onClick={() => handleTypeSelect(type)} className="w-full p-6 bg-white border-2 rounded-3xl font-black text-xl shadow-sm active:scale-95 transition-all">
+              {type}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2-1: 휴식 화면
   if (isResting) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white p-6">
         <span className="text-2xl font-bold text-slate-700 tracking-[0.4em] mb-8 uppercase">Resting</span>
-        <div className="text-[12rem] font-black text-blue-500 mb-20">{timeLeft}</div>
+        <div className="text-[12rem] font-black text-blue-500 leading-none mb-20">{timeLeft}</div>
         <button onClick={handleSkipRest} className="w-full max-w-[320px] py-8 border-2 border-white/10 rounded-full text-3xl font-black active:bg-white active:text-black">SKIP</button>
       </div>
     );
   }
 
+  // Step 2-2: 운동 화면
   const currentExercise = selectedRoutine.exercises[currentExIndex];
   const currentSet = sets[currentSetIndex];
 
@@ -131,17 +164,14 @@ export default function Home() {
           <span className="text-[35rem] font-black animate-ping">{tempoCount}</span>
         </div>
       )}
-
       <header className="absolute top-12 w-full max-w-[480px] px-10 flex justify-between items-center">
-        <button onClick={() => setSelectedRoutine(null)} className="text-gray-300 font-black text-sm">BACK</button>
-        <button onClick={() => setIsTempoOn(!isTempoOn)} className={`px-4 py-2 rounded-xl font-black text-xs ${isTempoOn ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'}`}>TEMPO</button>
+        <button onClick={() => setSelectionStep(1)} className="text-gray-300 font-black text-sm">EXIT</button>
+        <button onClick={() => setIsTempoOn(!isTempoOn)} className={`px-4 py-2 rounded-xl font-black text-xs ${isTempoOn ? 'bg-red-500 text-white shadow-lg shadow-red-200' : 'bg-gray-100 text-gray-400'}`}>TEMPO</button>
       </header>
-
       <div className="flex flex-col items-center flex-1 justify-center w-full">
         <span className="text-blue-600 font-black text-3xl uppercase tracking-tighter">{currentExercise.name}</span>
         <p className="text-gray-300 font-bold text-sm mt-1">{currentExercise.category} • {currentExercise.subCategory}</p>
-        <div className="text-xs font-black text-blue-500 bg-blue-50 px-4 py-1.5 rounded-full my-10">SET {currentSetIndex + 1} / {sets.length}</div>
-        
+        <div className="text-xs font-black text-blue-500 bg-blue-50 px-4 py-1.5 rounded-full my-10 uppercase tracking-tighter">Set {currentSetIndex + 1} / {sets.length}</div>
         <div className="flex items-center space-x-6 mb-20">
           <div className="flex flex-col items-center">
             <input type="number" value={currentSet.weight} onChange={(e) => updateSetValue(currentSetIndex, "weight", Number(e.target.value))} className="w-36 text-9xl font-black text-center border-none p-0 focus:ring-0" />
