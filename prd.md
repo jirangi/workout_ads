@@ -1,4 +1,4 @@
-# 📑 Minimal Fit v1.40 PRD (상세 설계서)
+# 📑 Minimal Fit v1.41 PRD (상세 설계서)
 
 ## 1. 제품 개요 (Product Overview)
 * **제품명**: Minimal Fit (미니멀 핏)
@@ -22,23 +22,23 @@
 * **[F4] 중급자용 스마트 증량 로직 (Progression)**: 마지막 성공 데이터로부터 14일 경과 시 AI가 무게 5kg 상향을 자동 제안. [대기]
 
 ### [인프라 및 자동화]
-* **[F6] 배포 파이프라인 안정화**: GitHub Actions 빌드 시 `package-lock.json` 누락 방지 및 환경 최적화. [완료]
+* **[F6] 배포 파이프라인 안정화 (Deployment Fix)**: 
+    - GitHub Actions 빌드 시 `package-lock.json` 누락 방지. [완료]
+    - **404 에러 방지**: `next.config.mjs`에 `basePath` 및 `assetPrefix` 설정 적용. [v1.41 수정]
+    - **Jekyll 무시**: 빌드 결과물에 `.nojekyll` 파일을 포함하여 `_next` 폴더 인식 보장. [v1.41 수정]
 * **[F8] AI 주도적 무결성 검증 (AI Quality Gate)**: AI가 업데이트 전 저장소 상태 분석 및 가상 빌드 테스트 수행. [활성]
 
 ### [사용자 경험 및 확장]
-* **[F13] 세트 자동 카운팅 및 휴식 전환 로직**: 세트 완료 시 자동 휴식 타이머(60s) 진입 및 `bg-slate-950` 기반 다크 모드 전체 화면 오버레이 적용. [완료]
+* **[F13] 세트 자동 카운팅 및 휴식 전환 로직**: 세트 완료 시 자동 휴식 타이머(60s) 진입 및 다크 모드 전체 화면 오버레이 적용. [완료]
 * **[F14] 다중 루틴 프리셋 시스템**: 초급/중급/고급 숙련도별 5종 루틴 선택 기능. [완료]
-* **[F15] 운동 메타데이터 DB 분리 관리**: 가슴, 등, 어깨 등 상세 종목 데이터를 `data/exercises.ts`에서 독립적으로 관리. [완료]
+* **[F15] 운동 메타데이터 DB 분리 관리**: 상세 종목 데이터를 `data/exercises.ts`에서 독립적으로 관리. [완료]
 
 ## 4. 데이터 및 시스템 설계 (System Design)
 * **프론트엔드**: Next.js (App Router) 기반 반응형 웹/앱 레이아웃.
-* **파일 아키텍처**: 
-    - `app/page.tsx`: 메인 비즈니스 로직 및 상태 관리.
-    - `data/exercises.ts`: 운동 메타데이터 DB. 빌드 안정성을 위해 상대 경로(`../data/exercises`) 참조 권장.
-* **상태 관리**: `useState`를 통해 세트 데이터(`sets`) 관리 및 `handleInputChange`를 통한 실시간 동기화.
+* **배포 정책**: GitHub Pages 배포를 위해 `output: 'export'` 및 저장소명(`/workout_ads`) 기반의 경로 설정 준수.
 
 ## 5. AI 자동화 파이프라인 적용 (Automation Pipeline)
-* **Step 1 (기획)**: 시장 분석 데이터를 프롬프트에 주입하여 본 PRD를 자동 갱신함.
+* **Step 1 (기획)**: 본 PRD를 통한 기능 명세 자동 갱신.
 * **Step 2 (검증/테스트)**: AI가 현재 저장소의 빌드 성공 여부를 상시 모니터링하여 무결성을 확인함.
 * **Step 3 (개발)**: 검증된 환경 위에서 본 PRD 명세를 기반으로 AI가 코드를 생성함.
 * **Step 4 (배포)**: 정적 내보내기 완료 후 GitHub Actions를 통해 자동 반영.
