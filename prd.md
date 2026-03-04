@@ -1,4 +1,4 @@
-# 📑 Minimal Fit v1.52 PRD (상세 설계서)
+# 📑 Minimal Fit v1.53 PRD (상세 설계서)
 
 ## 1. 제품 개요 (Product Overview)
 * **제품명**: Minimal Fit (미니멀 핏)
@@ -8,24 +8,20 @@
 ## 2. 타겟 유저 (Target Audience)
 * **New User**: 최초 진입 시 숙련도 설정을 통해 맞춤형 루틴을 생성해야 하는 사용자.
 * **Returning User**: 기존 루틴을 빠르게 재개하고 리워드를 획득하려는 사용자.
-* **Zero-Click User**: 세트 간 조작을 최소화하고 싶은 웨이트 트레이너.
 
 ## 3. 기능 상세 정의 (Feature Specifications)
 
 ### [핵심 엔진 및 로직]
 * **[F1] Zero-Click 세트 동기화 (Set Sync)**: 
-    - 1세트 수정 시 `isEdited: false`인 후속 세트에 데이터 실시간 전파.
-    - `isEdited` 필드를 통해 사용자의 개별 수정값 보호 (Override 방지).
+    - 1세트 수정 시 `isEdited: false`인 후속 세트에 데이터 실시간 전파 및 Override 방지.
 * **[F2] 1초 단위 AI 박자 가이드**: 1초 간격 한국어 음성 및 배경 애니메이션 제공.
 * **[F3] 프리미엄 카드 UI 및 중앙 정렬**: 모든 UI는 화면 정중앙 배치 및 카드 기반 레이아웃 적용.
 
 ### [수익화 및 리워드]
 * **[F16] 일일 리워드 한도 시스템**: 
-    - 휴식(광고) 시청 완료 시 30FP 적립.
-    - **하루 최대 2회**까지만 적립 가능 (한도 초과 시 적립 불가 안내).
+    - 휴식(광고) 시청 완료 시 30FP 적립. 하루 최대 2회 한정.
 * **[F17] 통합 대시보드 및 리워드 샵**: 
-    - 헤더에 [포인트 + 샵 진입] 통합 버튼 배치.
-    - 가상 물품 구매 프로세스 시뮬레이션 UI 제공.
+    - 헤더에 [포인트 + 샵 진입] 통합 버튼 배치 및 가상 샵 UI 제공.
 
 ### [사용자 경험 및 네비게이션]
 * **[F14] 온보딩 및 그리드 레이아웃**: 
@@ -34,7 +30,6 @@
 
 ## 4. 데이터 및 시스템 설계 (System Design)
 * **프론트엔드**: Next.js 기반 반응형 레이아웃 (중앙 프레임 480px 고정).
-* **상태 관리**: `view`, `userPoints`, `rewardCountToday`, `lastRoutine` 등 전역 상태 관리.
 * **배포 정책**: GitHub Pages 배포 (`output: 'export'`, `basePath: '/workout_ads'`).
 
 ## 5. AI 자동화 파이프라인 적용 (Automation Pipeline)
