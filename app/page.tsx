@@ -26,6 +26,39 @@ export default function Home() {
     }
   }, []);
 
+  // [F13] 휴식 타이머 버그 수정: 1초마다 차감 로직 추가
+  useEffect(() => {
+    let timer: any;
+    if (isResting && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (isResting && timeLeft === 0) {
+      handleSkipRest();
+    }
+    return () => clearInterval(timer);
+  }, [isResting, timeLeft]);
+
+  // [F2] 템포 엔진 로직
+  useEffect(() => {
+    let interval: any;
+    if (isTempoOn && !isResting && view === "WORKOUT") {
+      interval = setInterval(() => {
+        setTempoCount((prev) => {
+          const nextCount = prev + 1;
+          if (speechRef.current) {
+            speechRef.current.text = nextCount.toString();
+            window.speechSynthesis.speak(speechRef.current);
+          }
+          return nextCount;
+        });
+      }, 1000);
+    } else {
+      setTempoCount(0);
+    }
+    return () => clearInterval(interval);
+  }, [isTempoOn, isResting, view]);
+
   const setupExercise = (ex: any) => {
     setSets(Array(3).fill(null).map((_, i) => ({
       id: i + 1, weight: ex.defaultWeight || 40, reps: ex.defaultReps || 12, isEdited: false
@@ -65,9 +98,12 @@ export default function Home() {
       setCurrentSetIndex(0);
       setupExercise(selectedRoutine.exercises[nextIdx]);
     } else {
+      alert("루틴 완료! 30FP 적립.");
       setView("HOME");
     }
   };
+
+  // --- Views ---
 
   if (view === "HOME") {
     return (
@@ -108,14 +144,55 @@ export default function Home() {
     );
   }
 
+  // [F17] 포인트 샵 뷰 복구
+  if (view === "SHOP" || view === "MYPAGE") {
+    const shopItems = [
+      { id: "coffee", name: "아메리카노", price: 1500, emoji: "☕" },
+      { id: "protein", name: "프로틴 쉐이크", price: 3500, emoji: "🥤" },
+      { id: "strap", name: "스트랩", price: 12000, emoji: "🎗️" }
+    ];
+
+    return (
+      <div className="flex flex-col items-center min-h-screen p-8 bg-white">
+        <header className="w-full flex justify-between items-center mb-10">
+          <button onClick={() => setView("HOME")} className="text-slate-300 font-black">← BACK</button>
+          <span className="font-black text-xl uppercase tracking-widest">Store</span>
+        </header>
+        <div className="w-full bg-blue-600 rounded-[2rem] p-8 text-white mb-10 shadow-xl">
+          <p className="text-blue-200 text-xs font-bold mb-1 uppercase">Available balance</p>
+          <h2 className="text-4xl font-black">{userPoints.toLocaleString()} FP</h2>
+        </div>
+        <div className="grid grid-cols-1 w-full gap-4">
+          {shopItems.map(item => (
+            <div key={item.id} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border-2 border-slate-100">
+              <div className="flex items-center space-x-4">
+                <span className="text-3xl">{item.emoji}</span>
+                <div>
+                  <p className="font-black text-slate-800">{item.name}</p>
+                  <p className="text-blue-600 font-bold text-sm">{item.price} FP</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => alert(userPoints >= item.price ? "구매 완료!" : "포인트 부족")}
+                className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black active:scale-95 transition-all"
+              >
+                BUY
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (view === "SELECT_LEVEL") {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-slate-50">
         <header className="absolute top-12 left-8"><button onClick={() => setView("HOME")} className="text-slate-300 font-black">← BACK</button></header>
-        <h2 className="text-3xl font-black mb-12 italic text-slate-900">CHOOSE LEVEL</h2>
+        <h2 className="text-3xl font-black mb-12 italic text-slate-900 uppercase">Level</h2>
         <div className="w-full max-w-[320px] space-y-4">
           {["초급", "중급", "고급", "사용자 지정"].map((lvl) => (
-            <button key={lvl} onClick={() => { setSelectedLevel(lvl); setView("SELECT_TYPE"); }} className="w-full p-7 bg-white rounded-[2rem] shadow-sm font-black text-xl border-2 border-transparent hover:border-blue-500 active:scale-95 transition-all">
+            <button key={lvl} onClick={() => { setSelectedLevel(lvl); setView("SELECT_TYPE"); }} className="w-full p-7 bg-white rounded-[2rem] shadow-sm font-black text-xl active:scale-95 transition-all">
               {lvl}
             </button>
           ))}
@@ -124,16 +201,31 @@ export default function Home() {
     );
   }
 
-  // 운동/휴식 화면 (Centered Premium UI)
+  if (view === "SELECT_TYPE") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-slate-50">
+        <header className="absolute top-12 left-8"><button onClick={() => setView("SELECT_LEVEL")} className="text-slate-300 font-black">← BACK</button></header>
+        <h2 className="text-3xl font-black mb-12 italic text-slate-900 uppercase">{selectedLevel}</h2>
+        <div className="w-full max-w-[320px] space-y-4">
+          {["추천루틴", "무분할", "2분할(상하체)"].map((type) => (
+            <button key={type} onClick={() => startRoutine({ name: `${selectedLevel} ${type}`, exercises: [EXERCISE_DATABASE[0], EXERCISE_DATABASE[1]] })} className="w-full p-7 bg-white rounded-[2rem] shadow-sm font-black text-xl active:scale-95 transition-all">
+              {type}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (isResting) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white p-8">
         <div className="w-full aspect-video bg-white/5 rounded-[2.5rem] mb-12 flex items-center justify-center border border-white/10 text-center p-6">
-          <p className="text-white/20 font-black tracking-widest animate-pulse">60s REWARD AD<br/>+30FP</p>
+          <p className="text-white/20 font-black tracking-widest animate-pulse uppercase">60s REWARD AD<br/>+30FP 적립 중</p>
         </div>
         <span className="text-2xl font-bold text-slate-700 tracking-[0.4em] mb-8 uppercase">Resting</span>
         <div className="text-[12rem] font-black text-blue-500 leading-none mb-20">{timeLeft}</div>
-        <button onClick={handleSkipRest} className="w-full max-w-[320px] py-8 border-2 border-white/10 rounded-full text-3xl font-black active:bg-white active:text-black transition-all">SKIP</button>
+        <button onClick={handleSkipRest} className="w-full max-w-[320px] py-8 border-2 border-white/10 rounded-full text-3xl font-black active:bg-white active:text-black">SKIP</button>
       </div>
     );
   }
@@ -142,15 +234,15 @@ export default function Home() {
     const currentEx = selectedRoutine.exercises[currentExIndex];
     const currentSet = sets[currentSetIndex];
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-white relative overflow-hidden text-center">
+      <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-white relative text-center">
         <header className="absolute top-12 w-full px-10 flex justify-between items-center">
           <button onClick={() => setView("HOME")} className="text-slate-300 font-black text-sm uppercase">Exit</button>
           <button onClick={() => setIsTempoOn(!isTempoOn)} className={`px-4 py-2 rounded-xl font-black text-xs ${isTempoOn ? 'bg-red-500 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}>TEMPO</button>
         </header>
-        <div className="flex flex-col items-center justify-center flex-1 w-full mt-10">
+        <div className="flex flex-col items-center flex-1 justify-center w-full mt-10">
           <span className="text-blue-600 font-black text-3xl uppercase tracking-tighter">{currentEx.name}</span>
           <p className="text-slate-300 font-bold text-sm mt-1 mb-10">{currentEx.category} • {currentEx.subCategory}</p>
-          <div className="text-xs font-black text-blue-500 bg-blue-50 px-4 py-1.5 rounded-full mb-12">SET {currentSetIndex + 1} / {sets.length}</div>
+          <div className="text-xs font-black text-blue-500 bg-blue-50 px-4 py-1.5 rounded-full mb-12 uppercase tracking-widest">Set {currentSetIndex + 1} / {sets.length}</div>
           <div className="flex items-center space-x-6 mb-20">
             <div className="flex flex-col items-center">
               <input type="number" value={currentSet.weight} onChange={(e) => updateSetValue(currentSetIndex, "weight", Number(e.target.value))} className="w-32 text-8xl font-black text-center border-none p-0 focus:ring-0" />
