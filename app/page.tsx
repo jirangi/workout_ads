@@ -1,53 +1,295 @@
-# 📑 Minimal Fit v1.60 PRD (상세 설계서)
+"use client";
+import { useState, useEffect, useRef } from "react";
+import { EXERCISE_DATABASE, ExerciseInfo } from "../data/exercises";
 
-## 1. 제품 개요 (Product Overview)
-* **제품명**: Minimal Fit (미니멀 핏)
-* **한 줄 정의**: 150종의 인체해부학적 정밀 종목 데이터와 순환형 루틴 알고리즘을 결합한 리워드형 지능형 운동 플랫폼.
-* **핵심 목표**: 사용자가 종목 선택 고민 없이 '지난번 끝난 지점'부터 바로 운동을 이어가게 만드는 자동화 환경 구축.
+export default function Home() {
+  const [view, setView] = useState("HOME");
+  const [selectedRoutine, setSelectedRoutine] = useState<any>(null);
+  const [lastRoutine, setLastRoutine] = useState<any>(null);
+  const [userPoints, setUserPoints] = useState(1250);
+  const [rewardCountToday, setRewardCountToday] = useState(0); 
 
-## 2. 타겟 유저 (Target Audience)
-* **Smart Optimizer**: 체계적으로 모든 종목을 골고루 수행하고 싶어하는 사용자.
-* **Returning User**: "저번에 뭐 했지?" 고민 없이 앱을 켜자마자 다음 순번 운동을 하고 싶은 사용자.
-* **New User**: 최초 진입 시 숙련도 설정을 통해 맞춤형 루틴을 생성해야 하는 사용자.
+  // [F23] 순환형 루틴 관리를 위한 카테고리별 마지막 인덱스
+  const [lastIndices, setLastIndices] = useState<Record<string, number>>({
+    "가슴": -1, "등": -1, "하체": -1, "어깨": -1, "팔": -1, "복근": -1
+  });
 
-## 3. 기능 상세 정의 (Feature Specifications)
+  const [workoutStartTime, setWorkoutStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [currentExIndex, setCurrentExIndex] = useState(0);
+  const [sets, setSets] = useState<any[]>([]);
+  const [currentSetIndex, setCurrentSetIndex] = useState(0);
+  const [isResting, setIsResting] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [isTempoOn, setIsTempoOn] = useState(false);
+  const [tempoCount, setTempoCount] = useState(0);
+  const speechRef = useRef<any>(null);
 
-### [핵심 엔진 및 로직]
-* **[F1] Zero-Click 세트 동기화 (Set Sync)**: 
-    - 1세트 수정 시 `isEdited: false`인 후속 세트에 데이터 실시간 전파 및 Override 방지.
-* **[F2] 1초 단위 AI 박자 가이드 (Tempo Engine)**: 1초 간격 한국어 음성 템포 가이드 제공.
-* **[F20] 글로벌 운동 타이머**: 세션 시작부터 종료(Workout End)까지의 총 시간 실시간 기록.
-* **[F23] 순환형 루틴 알고리즘 (Rolling Routine)**: 
-    - **로직**: 카테고리별(가슴, 어깨 등) 마지막 수행 종목의 인덱스를 저장.
-    - **동작**: 다음 운동 시 `(마지막 인덱스 + 1) % 전체 종목 수` 위치부터 루틴 구성. 모든 종목을 소외 없이 순환 수행 가능.
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      speechRef.current = new SpeechSynthesisUtterance();
+      speechRef.current.lang = "ko-KR";
+      speechRef.current.rate = 1.3;
+      if (!lastRoutine) setView("SELECT_LEVEL");
+    }
+  }, [lastRoutine]);
 
-### [사용자 경험 및 기록]
-* **[F24] 운동 완료 및 종료 시스템**:
-    - **DONE (세트 완료)**: 세트 종료 및 광고/리워드(30FP) 발생.
-    - **WORKOUT END (오늘 운동 끝내기)**: 전체 세션 종료, 총 시간/종목 수 기록 및 홈 화면 이동.
-* **[F25] 루틴 확인 화면 (Routine Check)**: 운동 중 언제든 오늘 예정된 전체 종목 리스트를 확인할 수 있는 오버레이 UI.
-* **[F14] 온보딩 및 스마트 홈**: 신규 유저 강제 온보딩 및 50:50 그리드 버튼 레이아웃 적용.
+  // [F20] 글로벌 타이머
+  useEffect(() => {
+    let timer: any;
+    if ((view === "WORKOUT" || view === "REST") && workoutStartTime) {
+      timer = setInterval(() => setElapsedTime(Math.floor((Date.now() - workoutStartTime) / 1000)), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [view, workoutStartTime]);
 
-### [데이터베이스]
-* **[F15] 150종 해부학적 정밀 DB**: 18개 해부학적 소분류(가슴 상/중/하, 등 너비/두께 등)별 최소 8개 이상의 종목 완비.
+  useEffect(() => {
+    let timer: any;
+    if (isResting && timeLeft > 0) {
+      timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+    } else if (isResting && timeLeft === 0) {
+      handleSkipRest();
+    }
+    return () => clearInterval(timer);
+  }, [isResting, timeLeft]);
 
-## 4. 데이터 및 시스템 설계 (System Design)
-* **프론트엔드**: Next.js (App Router) 기반 반응형 레이아웃 (중앙 프레임 480px 고정).
-* **상태 관리**: `lastIndices` 객체를 통해 부위별 진행 상황 저장.
-* **배포 정책**: GitHub Pages 배포 (`output: 'export'`, `basePath: '/workout_ads'`).
+  // [F23] 순환형 루틴 생성 로직 (PPL 추천 루틴 기반)
+  const generateRollingRoutine = (level: string, splitType: string) => {
+    let exerciseCount = level === "초급" ? 4 : level === "중급" ? 6 : 9;
+    let targetCats: string[] = [];
+    if (splitType === "상체") targetCats = ["가슴", "등", "어깨", "팔"];
+    else if (splitType === "하체") targetCats = ["하체", "복근"];
+    else targetCats = ["가슴", "등", "하체", "어깨"];
 
-## 5. AI 자동화 파이프라인 적용 (Automation Pipeline)
-* **Step 1 (기획)**: 본 PRD를 통한 기능 명세 자동 갱신 및 히스토리 관리.
-* **Step 2 (검증/테스트)**: AI가 저장소 빌드 성공 여부를 상시 모니터링하여 무결성 확인.
-* **Step 3 (개발)**: PRD 명세를 기반으로 AI가 코드 생성 및 최적화.
-* **Step 4 (배포)**: GitHub Actions를 통해 정적 파일 배포 자동화.
+    let newExercises: ExerciseInfo[] = [];
+    let updatedIndices = { ...lastIndices };
 
-## 6. 수익화 및 광고 도입 계획 (Monetization)
-* **광고 수익 분배**: 수익의 30%를 유저에게 FP로 적립 (7:3 배분 정책).
-* **구글 광고(AdMob) 도입**: 전면 광고(Interstitial) 단위를 휴식 모드(`isResting`) 진입 시 호출.
-* **커머스 확장**: 포인트 샵 내 실제 헬스 브랜드 제휴 및 물품 공급.
+    // 각 카테고리별로 다음 순번 종목 추출
+    targetCats.forEach(cat => {
+      const catExs = EXERCISE_DATABASE.filter(e => e.category === cat);
+      if (catExs.length > 0) {
+        const nextIdx = (updatedIndices[cat] + 1) % catExs.length;
+        newExercises.push(catExs[nextIdx]);
+        updatedIndices[cat] = nextIdx;
+      }
+    });
 
-## 7. 문서 관리 및 버전 관리 정책
-* **버전 체계**: Semantic Versioning 적용.
-* **PRD 제공 방식 [필수]**: 변경 시 항상 **전문(Full Text)**을 코드 블록 내에 작성하여 제공함.
-* **커밋 메시지 표준**: `커밋명 [ver] 제목 / 내용 [commit 주요 내용]` (줄바꿈 준수)
+    setLastIndices(updatedIndices);
+    startRoutine({ name: `${level} ${splitType} (Rolling)`, exercises: newExercises.slice(0, exerciseCount) });
+  };
+
+  const startRoutine = (routine: any) => {
+    setSelectedRoutine(routine);
+    setLastRoutine(routine);
+    setCurrentExIndex(0);
+    setCurrentSetIndex(0);
+    setWorkoutStartTime(Date.now());
+    setElapsedTime(0);
+    setupExercise(routine.exercises[0]);
+    setView("WORKOUT");
+  };
+
+  const setupExercise = (ex: any) => {
+    setSets(Array(3).fill(null).map((_, i) => ({
+      id: i + 1, weight: ex.defaultWeight, reps: ex.defaultReps, isEdited: false
+    })));
+  };
+
+  const handleSkipRest = () => {
+    if (rewardCountToday < 2) {
+      setUserPoints(prev => prev + 30);
+      setRewardCountToday(prev => prev + 1);
+    }
+    setIsResting(false);
+    setTimeLeft(60);
+    if (currentSetIndex < sets.length - 1) {
+      setCurrentSetIndex(prev => prev + 1);
+    } else if (currentExIndex < selectedRoutine.exercises.length - 1) {
+      const nextIdx = currentExIndex + 1;
+      setCurrentExIndex(nextIdx);
+      setCurrentSetIndex(0);
+      setupExercise(selectedRoutine.exercises[nextIdx]);
+    } else {
+      setView("SESSION_FINISH");
+    }
+  };
+
+  const updateSetValue = (index: number, field: "weight" | "reps", value: number) => {
+    const newSets = [...sets];
+    newSets[index][field] = value;
+    if (index > 0) newSets[index].isEdited = true;
+    if (index === 0) {
+      for (let i = 1; i < newSets.length; i++) {
+        if (!newSets[i].isEdited) newSets[i][field] = value;
+      }
+    }
+    setSets(newSets);
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
+  };
+
+  // --- Views ---
+
+  if (view === "HOME") {
+    return (
+      <div className="flex flex-col items-center min-h-screen p-6 bg-slate-50">
+        <header className="w-full flex justify-between items-center py-6">
+          <h1 className="text-2xl font-black text-slate-900 tracking-tighter italic uppercase">Minimal Fit</h1>
+          <button onClick={() => setView("SHOP")} className="bg-white px-4 py-2 rounded-2xl shadow-sm border flex items-center space-x-2 active:scale-95 transition-all">
+            <span className="text-lg">💎</span>
+            <span className="font-black text-sm">{userPoints.toLocaleString()} FP</span>
+          </button>
+        </header>
+        <div className="w-full max-w-[400px] mt-10 space-y-4">
+          <button onClick={() => generateRollingRoutine("초급", "무분할")} 
+            className="w-full aspect-[16/9] bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2.5rem] p-10 text-left text-white shadow-2xl relative overflow-hidden active:scale-95 transition-all">
+            <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 inline-block">Daily Rolling</span>
+            <h2 className="text-3xl font-black italic">내 루틴 시작하기</h2>
+            <p className="text-blue-100 text-sm opacity-80 mt-1">지난 운동 다음 종목부터 시작합니다 →</p>
+          </button>
+          <div className="grid grid-cols-2 gap-4">
+            <button onClick={() => setView("SELECT_LEVEL")} className="bg-white p-8 rounded-[2.2rem] border-2 border-slate-100 shadow-sm flex flex-col items-center justify-center active:scale-95 transition-all">
+              <span className="text-2xl mb-2">⚡</span>
+              <span className="font-black text-slate-800 text-sm">루틴 변경</span>
+            </button>
+            <button onClick={() => setView("SHOP")} className="bg-white p-8 rounded-[2.2rem] border-2 border-slate-100 shadow-sm flex flex-col items-center justify-center active:scale-95 transition-all">
+              <span className="text-2xl mb-2">🛍️</span>
+              <span className="font-black text-slate-800 text-sm">리워드 샵</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "ROUTINE_CHECK") {
+    return (
+      <div className="fixed inset-0 bg-white z-50 p-8 overflow-y-auto">
+        <header className="flex justify-between items-center mb-8">
+          <h2 className="text-2xl font-black italic uppercase">Today's Routine</h2>
+          <button onClick={() => setView("WORKOUT")} className="text-slate-400 font-black">CLOSE ✕</button>
+        </header>
+        <div className="space-y-4">
+          {selectedRoutine?.exercises.map((ex: any, idx: number) => (
+            <div key={idx} className={`p-6 rounded-3xl border-2 ${idx === currentExIndex ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-slate-50'}`}>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">{ex.subTarget} | {ex.equipment}</p>
+              <p className="font-black text-slate-800">{ex.name}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "SESSION_FINISH") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-blue-600 text-white text-center">
+        <h2 className="text-5xl font-black italic mb-4 uppercase">Session Done!</h2>
+        <div className="bg-white/10 p-10 rounded-[3rem] mb-12 w-full max-w-[320px]">
+          <p className="text-blue-200 font-bold text-sm uppercase mb-2">Duration</p>
+          <p className="text-6xl font-black">{formatTime(elapsedTime)}</p>
+        </div>
+        <button onClick={() => setView("HOME")} className="w-full max-w-[320px] py-8 bg-white text-blue-600 rounded-full text-2xl font-black shadow-2xl active:scale-95 transition-all">
+          오늘 운동 끝내기
+        </button>
+      </div>
+    );
+  }
+
+  if (isResting) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white p-8 text-center">
+        <div className="w-full aspect-video bg-white/5 rounded-[2.5rem] mb-12 flex items-center justify-center border border-white/10 p-6">
+          <p className="text-white/20 font-black tracking-widest animate-pulse uppercase leading-tight italic">Reward Ad Loading...<br/>Get 30FP on skip</p>
+        </div>
+        <div className="text-[12rem] font-black text-blue-500 leading-none mb-20">{timeLeft}</div>
+        <button onClick={handleSkipRest} className="w-full max-w-[320px] py-8 border-2 border-white/10 rounded-full text-3xl font-black active:bg-white active:text-black transition-all">SKIP</button>
+      </div>
+    );
+  }
+
+  if (view === "WORKOUT" && selectedRoutine) {
+    const currentEx = selectedRoutine.exercises[currentExIndex];
+    const currentSet = sets[currentSetIndex];
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-white relative text-center">
+        <header className="absolute top-12 w-full px-10 flex justify-between items-center">
+          <button onClick={() => setView("ROUTINE_CHECK")} className="text-blue-600 font-black text-xs uppercase underline">Check Routine</button>
+          <div className="text-slate-400 font-black text-sm uppercase">{formatTime(elapsedTime)}</div>
+          <button onClick={() => setView("SESSION_FINISH")} className="text-red-500 font-black text-xs uppercase">End Session</button>
+        </header>
+        <div className="flex flex-col items-center flex-1 justify-center w-full mt-10">
+          <span className="text-blue-600 font-black text-4xl uppercase tracking-tighter italic mb-1">{currentEx.name}</span>
+          <p className="text-slate-400 font-bold text-[10px] uppercase mb-10 tracking-[0.2em]">{currentEx.subTarget} | {currentEx.equipment}</p>
+          <div className="text-xs font-black text-blue-500 bg-blue-50 px-5 py-2 rounded-full mb-12 uppercase">Set {currentSetIndex + 1} / {sets.length}</div>
+          <div className="flex items-center space-x-6 mb-24">
+            <div className="flex flex-col items-center">
+              <input type="number" value={currentSet.weight} onChange={(e) => updateSetValue(currentSetIndex, "weight", Number(e.target.value))} className="w-32 text-8xl font-black text-center border-none p-0 focus:ring-0 bg-transparent text-slate-900" />
+              <span className="text-slate-300 font-black text-sm uppercase italic">kg</span>
+            </div>
+            <div className="text-6xl text-slate-100 font-light pb-10">×</div>
+            <div className="flex flex-col items-center">
+              <input type="number" value={currentSet.reps} onChange={(e) => updateSetValue(currentSetIndex, "reps", Number(e.target.value))} className="w-32 text-8xl font-black text-center border-none p-0 focus:ring-0 bg-transparent text-slate-900" />
+              <span className="text-slate-300 font-black text-sm uppercase italic">reps</span>
+            </div>
+          </div>
+        </div>
+        <button onClick={() => setIsResting(true)} className="w-full max-w-[400px] py-10 bg-slate-900 text-white rounded-[2.5rem] text-4xl font-black mb-10 shadow-2xl active:scale-95 transition-all">DONE</button>
+      </div>
+    );
+  }
+
+  // SELECT_LEVEL 등 온보딩 뷰 (v1.56 디자인 계승)
+  if (view === "SELECT_LEVEL") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-slate-50">
+        <h2 className="text-3xl font-black mb-12 italic uppercase">숙련도 선택</h2>
+        <div className="w-full max-w-[320px] space-y-4">
+          {["초급", "중급", "고급", "사용자 지정"].map((lvl) => (
+            <button key={lvl} onClick={() => { setSelectedLevel(lvl); setView("SELECT_TYPE"); }} className="w-full p-7 bg-white rounded-[2rem] shadow-sm font-black text-xl active:scale-95 hover:bg-blue-600 hover:text-white transition-all">
+              {lvl}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "SELECT_TYPE") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-slate-50">
+        <header className="absolute top-12 left-8"><button onClick={() => setView("SELECT_LEVEL")} className="text-slate-300 font-black">← BACK</button></header>
+        <h2 className="text-3xl font-black mb-12 italic uppercase">{selectedLevel} Routine</h2>
+        <div className="w-full max-w-[320px] space-y-4">
+          {["무분할", "상체", "하체"].map((type) => (
+            <button key={type} onClick={() => generateRollingRoutine(selectedLevel, type)} className="w-full p-7 bg-white rounded-[2rem] shadow-sm font-black text-xl active:scale-95 transition-all">
+              {type}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "SHOP") {
+    return (
+      <div className="flex flex-col items-center min-h-screen p-8 bg-white">
+        <header className="w-full flex justify-between items-center mb-10">
+          <button onClick={() => setView("HOME")} className="text-slate-300 font-black">← Back</button>
+          <span className="font-black text-xl text-slate-900 uppercase tracking-widest">Shop</span>
+        </header>
+        <div className="w-full bg-blue-600 rounded-[2.5rem] p-10 text-white mb-10 shadow-xl text-left">
+          <p className="text-blue-200 text-xs font-bold mb-2 uppercase tracking-widest font-black">Wallet Balance</p>
+          <h2 className="text-5xl font-black">{userPoints.toLocaleString()} FP</h2>
+        </div>
+        <p className="text-slate-400 font-bold text-center">150종의 운동으로 포인트를 모으세요!</p>
+      </div>
+    );
+  }
+
+  return null;
+}
